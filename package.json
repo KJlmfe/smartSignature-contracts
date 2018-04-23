@@ -1,0 +1,13 @@
+{
+  "name": "smartSignature-contracts",
+  "version": "1.0.0",
+  "main": "index.js",
+  "author": "KJlmfe <kjlmfe@gmail.com>",
+  "license": "MIT",
+  "scripts": {
+    "test": "truffle compile && truffle migrate && truffle test"
+  },
+  "dependencies": {
+    "truffle": "^4.1.7"
+  }
+}
