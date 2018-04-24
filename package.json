@@ -5,9 +5,11 @@
   "author": "KJlmfe <kjlmfe@gmail.com>",
   "license": "MIT",
   "scripts": {
-    "test": "truffle compile && truffle migrate && truffle test"
+    "test": "truffle compile && truffle migrate && truffle test",
+    "build": "sol-merger \"./contracts/*.sol\" ./dist"
   },
   "dependencies": {
+    "sol-merger": "^0.1.2",
     "truffle": "^4.1.7"
   }
 }
