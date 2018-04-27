@@ -18,18 +18,19 @@ contract SponsorToken is Owned {
         uint256 head;
         uint8 ponzi;
         address [] sponsors;
-        mapping (address => uint256) remain;  
+        mapping (address => uint256) remain;
+        mapping (address => uint256) total;
     }
-    
+
     Token[] public tokens;
-    
+
     constructor() public {}
-    
+
     function create(uint8 ponzi) public {
         require(ponzi >= 100 && ponzi <= 200);
 
         uint256 tokenId = tokens.length;
-        
+
         Token memory token = Token({
             id: tokenId,
             creator: msg.sender,
@@ -38,29 +39,30 @@ contract SponsorToken is Owned {
             value: 0,
             sponsors: new address[](0)
         });
-        
+
         tokens.push(token);
-        
+
         emit CreateToken(tokenId, msg.sender);
     }
-    
+
     function sponsor(uint256 _id, address _referrer) public payable {
         require(msg.value > 0);
         require(_id < tokens.length);
         require(_referrer != msg.sender);
         require(!_referrer.isContract());
-        
+
         Token storage token = tokens[_id];
-        token.sponsors.push(msg.sender); 
-                
+        token.sponsors.push(msg.sender);
+
         emit Sponsor(_id, msg.value, msg.sender, _referrer);
-        
-        uint256 msgValue = msg.value * 97 / 100; // 3% cut off for contract
-       
-        token.value += msgValue;
+
+        token.value += msg.value;
 
         // 存入尚未兑现的支票
-        token.remain[msg.sender] += msgValue * token.ponzi / 100;
+        token.total[msg.sender] += msg.value * token.ponzi / 100;
+        token.remain[msg.sender] += msg.value * token.ponzi / 100;
+
+        uint256 msgValue = msg.value * 97 / 100; // 3% cut off for contract
 
         if (_referrer != address(0) && token.remain[_referrer] > 0) {
             if (msgValue <= token.remain[_referrer]) {
@@ -75,7 +77,7 @@ contract SponsorToken is Owned {
                 token.remain[_referrer] = 0;
             }
         }
-        
+
         while(msgValue > 0) {
             // 除了自己之外，没有站岗的人了，把钱分给Token Creator
             if (token.head + 1 == token.sponsors.length) {
@@ -83,7 +85,7 @@ contract SponsorToken is Owned {
                 emit Reward(_id, msgValue, token.creator, msg.sender);
                 return;
             }
-            
+
             //  把钱分给站岗者们
             address _sponsor = token.sponsors[token.head];
             if (msgValue <= token.remain[_sponsor]) {
@@ -100,19 +102,20 @@ contract SponsorToken is Owned {
             }
         }
     }
-    
-    function remainOf(uint256 _id, address _sponsor) public view returns (uint256)  {
+
+    function totalAndRemainOf(uint256 _id, address _sponsor) public view returns (uint256 total, uint256 remain)  {
         require(_id < tokens.length);
         Token storage token = tokens[_id];
-        return token.remain[_sponsor];
+        total = token.total[_sponsor];
+        remain = token.remain[_sponsor];
     }
-    
+
     function sponsorsOf(uint256 _id) public view returns (address []) {
         require(_id < tokens.length);
-        Token storage token = tokens[_id];   
+        Token storage token = tokens[_id];
         return token.sponsors;
     }
-    
+
     function totalSupply() public view  returns (uint256)  {
         return tokens.length;
     }
