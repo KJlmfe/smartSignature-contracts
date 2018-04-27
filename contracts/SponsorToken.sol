@@ -9,7 +9,8 @@ contract SponsorToken is Owned {
 
     event CreateToken(uint256 indexed id, address indexed creator);
     event Sponsor(uint256 indexed id, uint256 value, address indexed sponsor, address indexed referrer);
-    
+    event Reward(uint256 indexed id, uint256 value, address indexed to, address indexed from);
+
     struct Token {
         uint256 id;
         address creator;
@@ -65,10 +66,12 @@ contract SponsorToken is Owned {
             if (msgValue <= token.remain[_referrer]) {
                 token.remain[_referrer] -= msgValue;
                 _referrer.transfer(msgValue);
+                emit Reward(_id, msgValue, _referrer, msg.sender);
                 return;
             } else {
                 msgValue -= token.remain[_referrer];
                 _referrer.transfer(token.remain[_referrer]);
+                emit Reward(_id, token.remain[_referrer], _referrer, msg.sender);
                 token.remain[_referrer] = 0;
             }
         }
@@ -77,6 +80,7 @@ contract SponsorToken is Owned {
             // 除了自己之外，没有站岗的人了，把钱分给Token Creator
             if (token.head + 1 == token.sponsors.length) {
                 token.creator.transfer(msgValue);
+                emit Reward(_id, msgValue, token.creator, msg.sender);
                 return;
             }
             
@@ -85,10 +89,12 @@ contract SponsorToken is Owned {
             if (msgValue <= token.remain[_sponsor]) {
                 token.remain[_sponsor] -= msgValue;
                 _sponsor.transfer(msgValue);
+                emit Reward(_id, msgValue, _sponsor, msg.sender);
                 return;
             } else {
                 msgValue -= token.remain[_sponsor];
                 _sponsor.transfer(token.remain[_sponsor]);
+                emit Reward(_id, token.remain[_sponsor], _sponsor, msg.sender);
                 token.remain[_sponsor] = 0;
                 token.head++;
             }
