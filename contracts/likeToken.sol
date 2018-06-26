@@ -94,6 +94,7 @@ contract SponsorToken is OwnerableContract{
   
   // create Order
   function put(address _issuer, uint256 _tokenId) public {
+    //TODO _tokenId unique?
     Issuer issuer = Issuer(_issuer);
     require(issuer.ownerOf(_tokenId) == msg.sender);
     address[] memory empty;
