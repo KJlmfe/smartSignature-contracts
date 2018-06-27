@@ -1,93 +1,100 @@
-pragma solidity ^0.4.22;
+pragma solidity ^0.4.23;
+/// @author MinakoKojima(https://github.com/lychees)
 
-import "./lib/AddressUtils.sol";
-import "./lib/Owned.sol";
+import "../lib/OwnerableContract.sol";
 
-contract LikeLike is Owned {
-    using AddressUtils for address;
-
-    // 内容（Token）
-    struct Item {
-        uint256 value; // 价值：收到的总赞赏金额
-        uint256 head;
-        uint8 ponzi;
-        address[] sponsors;
-        mapping (address => uint256) remain;
-        mapping (address => uint256) total;
+contract HotPotato is OwnerableContract{
+    struct Order {
+        address creator;
+        address issuer;
+        address owner;
+        uint256 tokenId;
+        uint256 price;
+        uint256 ratio;
+        uint256 startTime;
+        uint256 endTime;        
     }
 
-    // 用户
-    struct User {
-        mapping (uint256 => Item) itemMap; // 该用户关联的所有原创内容（Token）
+    Order[] private orderBook;
+    uint256 private orderBookSize;
+    
+    /* Util */
+    function isContract(address addr) internal view returns (bool) {
+        uint size;
+        assembly { 
+            size := extcodesize(addr) 
+        } // soliumdisableline
+        return size > 0;
+    }  
+
+    function getNextPrice (uint256 _price) public pure returns (uint256 _nextPrice) {
+        return _price * 123 / 100;
+    }      
+
+    function HotPotato() public { // 会调用父类构造函数吗？
+        owner = msg.sender;
+        admins[owner] = true;    
     }
-
-    mapping (address => User) userMap;
-
-    constructor() public {}
-
-    /**
-    * 打赏
-    *
-    * @param {address} _from - 打赏者
-    * @param {address} _to - 被打赏者
-    * @param {uint256} _item_id - 被打赏者的某项内容编号
-    * @param {string} _msg - 打赏附言
-    * @param {address} _referrer - 推荐者 （TODO：推荐者可能是多个，应该是个array）
-    *
-    * msg.sender - 代理商（打赏者可以授权给代理商，让代理商发出打赏，每个代理商是应该是一个合约，合约里可以自定义玩法，比如：打赏抽奖，打赏分红等）
-    */
-    function like(address _from, address _to, uint256 _item_id, string _msg, address _referrer) public payable {
-        address sender = msg.sender;
-
-        require(msg.value > 0); // 打赏金额大于0
-        require(_item_id >= 0);
-        require(_referrer != _from);
-        require(_referrer != _to);
-        require(_referrer != sender);
-        require(!_referrer.isContract());
-        // TODO: 如果 msg.sender != _from(非本人直接打赏), 需要检查msg.sender是否是白名单里的代理商
-
-        User storage user = userMap[_to]; // 被打赏者
-        Item storage item = user.itemMap[_item_id]; // 被打赏的内容
-
-        item.sponsors.push(_from);
-        item.value += msg.value;
-
-        // 存入尚未兑现的返利
-        item.total[_from] += msg.value * item.ponzi / 100;
-        item.remain[_from] += msg.value * item.ponzi / 100;
-
-        uint256 msgValue = msg.value * 97 / 100; // 3% cut off for contract
-
-        while(msgValue > 0) {
-            // 除了自己之外，没有站岗的人了，把钱分给被打赏者（_to）
-            if (item.head + 1 == item.sponsors.length) {
-                _to.transfer(msgValue);
-                // TODO: emit 事件
-                break;
-            }
-
-            //  把钱分给站岗者们
-            address _sponsor = item.sponsors[item.head];
-            if (msgValue <= item.remain[_sponsor]) {
-                item.remain[_sponsor] -= msgValue;
-                _sponsor.transfer(msgValue);
-                // TODO: emit 事件
-                break;
-            } else {
-                msgValue -= item.remain[_sponsor];
-                _sponsor.transfer(item.remain[_sponsor]);
-                // TODO: emit 事件
-                item.remain[_sponsor] = 0;
-                item.head++;
-            }
+  
+    function totalOrder() public view returns (uint256 _totalOrder) {
+        return orderBookSize;
+    }
+     // TODO complete order info
+    function getOrder(uint256 _id) public view returns (address _issuer /*, uint256 _tokenId, uint256 _ponzi*/) {
+        return (orderBook[_id].creator /**/ );
+    }
+  
+    /* Buy */
+    function put(address _issuer, uint256 _tokenId, uint256 _price, uint256 _ratio, uint256 _startTime, uint256 _endTime) public {
+        require(_startTime <= _endTime);                 
+        Issuer issuer = Issuer(_issuer);
+        require(issuer.ownerOf(_tokenId) == msg.sender);
+        issuer.transferFrom(msg.sender, address(this), _tokenId);
+        Order memory order = Order({
+            creator: msg.sender, 
+            owner: msg.sender, 
+            issuer: msg.sender, 
+            tokenId: _tokenId,
+            price: _price,
+            ratio: _ratio,
+            startTime: _startTime,
+            endTime: _endTime
+        });                
+        if (orderBookSize == orderBook.length) {        
+            orderBook.push(order);
+        } else {    
+            orderBook[orderBookSize] = order;
         }
-        // TODO: call 代理商msg.sender，告知打赏结果
+        orderBookSize += 1;
     }
 
-    function setPonzi(uint8 _ponzi, uint256 _item_id) public  {
-        require(_ponzi > 0);
-        Item storage item = userMap[msg.sender].itemMap[_item_id];
-        item.ponzi = _ponzi;
+    function buy(uint256 _id) public payable{
+        require(_id < orderBookSize);  
+        require(msg.value >= orderBook[_id].price);
+        require(msg.sender != orderBook[_id].owner);
+        require(!isContract(msg.sender));
+        require(orderBook[_id].startTime <= now && now <= orderBook[_id].endTime);
+        orderBook[_id].owner.transfer(orderBook[_id].price*24/25); // 96%
+        orderBook[_id].creator.transfer(orderBook[_id].price/50);  // 2%    
+        if (msg.value > orderBook[_id].price) {
+            msg.sender.transfer(msg.value - orderBook[_id].price);
+        }
+        orderBook[_id].owner = msg.sender;
+        orderBook[_id].price = getNextPrice(orderBook[_id].price);
     }
+
+    function redeem(uint256 _id) public {
+        require(msg.sender == orderBook[_id].owner);
+        require(orderBook[_id].endTime <= now);        
+        Issuer issuer = Issuer(orderBook[_id].issuer);
+        issuer.transfer(msg.sender, orderBook[_id].tokenId);    
+        orderBook[_id] = orderBook[orderBookSize-1];
+        orderBookSize -= 1;
+    }
+}
+
+interface Issuer {
+    function transferFrom(address _from, address _to, uint256 _tokenId) external;  
+    function transfer(address _to, uint256 _tokenId) external;
+    function ownerOf (uint256 _tokenId) external view returns (address _owner);
 }
