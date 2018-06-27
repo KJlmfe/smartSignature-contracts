@@ -1,11 +1,11 @@
 pragma solidity ^0.4.23;
 
-import "OwnerableContract.sol";
+import "./OwnerableContract.sol";
 
 /// @title Interface for contracts conforming to ERC-721: Non-Fungible Tokens
 /// @author MinakoKojima (https://github.com/lychees)
 contract ERC721Interface {
-    // Required methods
+// Required methods
     function totalSupply() public view returns (uint256 total);
     function balanceOf(address _owner) public view returns (uint256 balance);
     function ownerOf(uint256 _tokenId) public view returns (address owner);
@@ -33,53 +33,36 @@ contract ERC721 is ERC721Interface, OwnerableContract{
     event Transfer(address indexed _from, address indexed _to, uint256 _tokenId);
     event Approval(address indexed _owner, address indexed _approved, uint256 _tokenId);
 
-    uint256[] private listedTokens;
+	uint256 pravate total;
     mapping (uint256 => address) private ownerOfToken;
     mapping (uint256 => address) private approvedOfToken;
 
-    function ERC721() public {
-      owner = msg.sender;
-      admins[owner] = true;    
-    }
-
-    /* Withdraw */
-    /*
-      NOTICE: These functions withdraw the developer's cut which is left
-      in the contract by `buy`. User funds are immediately sent to the old
-      owner in `buy`, no user funds are left in the contract.
-    */
-    function withdrawAll() onlyAdmins() public {
-    msg.sender.transfer(address(this).balance);
-    }
-
-    function withdrawAmount(uint256 _amount) onlyAdmins() public {
-      msg.sender.transfer(_amount);
+    constructor() public {
+        owner = msg.sender;
+        admins[owner] = true;    
     }
 
     /* ERC721 */
-
     function name() public view returns (string _name) {
-      return "smartsignature.io";
+        return "smartsignature.io";
     }
 
     function symbol() public view returns (string _symbol) {
-      return "";
+        return "";
     }
 
     function totalSupply() public view returns (uint256 _totalSupply) {
-      return listedTokens.length;
+        return total;
     }
 
     function balanceOf (address _owner) public view returns (uint256 _balance) {
-      uint256 counter = 0;
-
-      for (uint256 i = 0; i < listedTokens.length; i++) {
-        if (ownerOf(listedTokens[i]) == _owner) {
-          counter++;
-        }
-      }
-
-      return counter;
+		uint256 counter = 0;
+      	for (uint256 i = 0; i < total; i++) {
+			if (ownerOf(i) == _owner) {
+				counter++;
+			}
+		}
+	  	return counter;
     }
 
     function ownerOf (uint256 _tokenId) public view returns (address _owner) {

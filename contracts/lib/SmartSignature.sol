@@ -5,8 +5,8 @@ import "./AddressUtils.sol";
 
 contract SmartSignature is ERC721{
     using AddressUtils for address;
-        
-    function SmartSignature() public {
+
+    constructor() public {
         owner = msg.sender;
         admins[owner] = true;    
     }

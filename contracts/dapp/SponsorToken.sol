@@ -20,7 +20,6 @@ contract SponsorToken is SmartSignature {
     }
 
     Token[] public tokens;
-
     constructor() public {}
 
     function totalAndRemainOf(uint256 _id, address _sponsor) public view returns (uint256 total, uint256 remain)  {

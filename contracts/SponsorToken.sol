@@ -22,7 +22,7 @@ contract SponsorToken is Owned {
         mapping (address => uint256) total;
     }
 
-    Token[] public tokens;
+    Token[] public tokens; // bug?
 
     constructor() public {}
 
