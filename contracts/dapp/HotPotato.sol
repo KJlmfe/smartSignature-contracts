@@ -1,12 +1,11 @@
 pragma solidity ^0.4.23;
 /// @author MinakoKojima(https://github.com/lychees)
 
-import "../lib/OwnerableContract.sol";
+import "../lib/SmartSignature.sol";
 
-contract HotPotato is OwnerableContract{
+contract HotPotato is SmartSignature, OwnerableContract{
     struct Order {
         address creator;
-        address issuer;
         address owner;
         uint256 tokenId;
         uint256 price;
@@ -32,6 +31,7 @@ contract HotPotato is OwnerableContract{
     }      
 
     function HotPotato() public { // 会调用父类构造函数吗？
+ //       SmartSignature();
         owner = msg.sender;
         admins[owner] = true;    
     }
@@ -44,16 +44,15 @@ contract HotPotato is OwnerableContract{
         return (orderBook[_id].creator /**/ );
     }
   
-    /* Buy */
-    function put(address _issuer, uint256 _tokenId, uint256 _price, uint256 _ratio, uint256 _startTime, uint256 _endTime) public {
-        require(_startTime <= _endTime);                 
-        Issuer issuer = Issuer(_issuer);
-        require(issuer.ownerOf(_tokenId) == msg.sender);
-        issuer.transferFrom(msg.sender, address(this), _tokenId);
+    /* ... */
+    function create(uint256 _price, uint256 _ratio, uint256 _startTime, uint256 _endTime) public {
+        require(_startTime <= _endTime);         
+        uint256 _tokenId = totalSupply();
+        issueTokenAndTransfer(msg.sender);        
+        transferFrom(msg.sender, address(this), _tokenId);
         Order memory order = Order({
-            creator: msg.sender, 
-            owner: msg.sender, 
-            issuer: msg.sender, 
+            creator: msg.sender,
+            owner: msg.sender,
             tokenId: _tokenId,
             price: _price,
             ratio: _ratio,
@@ -86,15 +85,8 @@ contract HotPotato is OwnerableContract{
     function redeem(uint256 _id) public {
         require(msg.sender == orderBook[_id].owner);
         require(orderBook[_id].endTime <= now);
-        Issuer issuer = Issuer(orderBook[_id].issuer);
-        issuer.transfer(msg.sender, orderBook[_id].tokenId);    
+        transfer(msg.sender, orderBook[_id].tokenId);    
         orderBook[_id] = orderBook[orderBookSize-1];
         orderBookSize -= 1;
     }
-}
-
-interface Issuer {
-    function transferFrom(address _from, address _to, uint256 _tokenId) external;  
-    function transfer(address _to, uint256 _tokenId) external;
-    function ownerOf (uint256 _tokenId) external view returns (address _owner);
 }
