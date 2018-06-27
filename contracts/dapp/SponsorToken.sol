@@ -1,11 +1,9 @@
-pragma solidity ^0.4.22;
+pragma solidity ^0.4.23;
+/// @author MinakoKojima(https://github.com/lychees)
 
-import "./lib/AddressUtils.sol";
-import './lib/Owned.sol';
+import "../lib/SmartSignature.sol";
 
-// TODO: SponsorToken is ERC721
-contract SponsorToken is Owned {
-    using AddressUtils for address;
+contract SponsorToken is SmartSignature {
 
     event CreateToken(uint256 indexed id, address indexed creator);
     event Sponsor(uint256 indexed id, uint256 value, address indexed sponsor, address indexed referrer);
@@ -13,7 +11,6 @@ contract SponsorToken is Owned {
 
     struct Token {
         uint256 id;
-        address creator;
         uint256 value;
         uint256 head;
         uint8 ponzi;
@@ -22,18 +19,30 @@ contract SponsorToken is Owned {
         mapping (address => uint256) total;
     }
 
-    Token[] public tokens; // bug?
-
+    Token[] public tokens;
     constructor() public {}
 
-    function create(uint8 ponzi) public {
-        require(ponzi >= 100 && ponzi <= 200);
+    function totalAndRemainOf(uint256 _id, address _sponsor) public view returns (uint256 total, uint256 remain)  {
+        require(_id < tokens.length);
+        Token storage token = tokens[_id];
+        total = token.total[_sponsor];
+        remain = token.remain[_sponsor];
+    }
 
-        uint256 tokenId = tokens.length;
+    function sponsorsOf(uint256 _id) public view returns (address[]) {
+        require(_id < tokens.length);
+        Token storage token = tokens[_id];
+        return token.sponsors;
+    }    
+
+    function create(uint8 ponzi) public {
+        require(ponzi >= 100 && ponzi <= 1000);
+
+        uint256 tokenId = totalSupply();
+        issueTokenAndTransfer(address(this));
 
         Token memory token = Token({
             id: tokenId,
-            creator: msg.sender,
             ponzi: ponzi,
             head: 0,
             value: 0,
@@ -57,7 +66,6 @@ contract SponsorToken is Owned {
         emit Sponsor(_id, msg.value, msg.sender, _referrer);
 
         token.value += msg.value;
-
         // 存入尚未兑现的支票
         token.total[msg.sender] += msg.value * token.ponzi / 100;
         token.remain[msg.sender] += msg.value * token.ponzi / 100;
@@ -78,11 +86,11 @@ contract SponsorToken is Owned {
             }
         }
 
-        while(msgValue > 0) {
+        while (msgValue > 0) {
             // 除了自己之外，没有站岗的人了，把钱分给Token Creator
             if (token.head + 1 == token.sponsors.length) {
-                token.creator.transfer(msgValue);
-                emit Reward(_id, msgValue, token.creator, msg.sender);
+                ownerOf(_id).transfer(msgValue);
+                emit Reward(_id, msgValue, ownerOf(_id), msg.sender);
                 return;
             }
 
@@ -101,22 +109,5 @@ contract SponsorToken is Owned {
                 token.head++;
             }
         }
-    }
-
-    function totalAndRemainOf(uint256 _id, address _sponsor) public view returns (uint256 total, uint256 remain)  {
-        require(_id < tokens.length);
-        Token storage token = tokens[_id];
-        total = token.total[_sponsor];
-        remain = token.remain[_sponsor];
-    }
-
-    function sponsorsOf(uint256 _id) public view returns (address[]) {
-        require(_id < tokens.length);
-        Token storage token = tokens[_id];
-        return token.sponsors;
-    }
-
-    function totalSupply() public view  returns (uint256)  {
-        return tokens.length;
     }
 }
