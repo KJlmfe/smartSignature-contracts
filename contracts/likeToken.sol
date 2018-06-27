@@ -1,5 +1,4 @@
 pragma solidity ^0.4.21;
-/// @author MinakoKojima(https://github.com/lychees), Lucas
 
 contract OwnerableContract{
     
@@ -58,17 +57,25 @@ contract SponsorToken is OwnerableContract {
     // withdrawable balance
     mapping (address => uint256) tip_reward_balance;
   }
-
+  
   Order[] private orderBook;
   uint256 private orderBookSize;
   uint256 constant tip_balance_holder_head = 1;
-
+  
   /* Util */
   function isContract(address addr) internal view returns (bool) {
     uint size;
     assembly { size := extcodesize(addr) } // soliumdisableline
     return size > 0;
-  }  
+  }
+  function percent(uint numerator, uint denominator, uint precision) public constant returns(uint quotient) {
+
+         // caution, check safe-to-multiply here
+        uint _numerator  = numerator * 10 ** (precision+1);
+        // with rounding of last digit
+        uint _quotient =  ((_numerator / denominator) + 5) / 10;
+        return ( _quotient);
+  }
 
   constructor() public {
     owner = msg.sender;
@@ -92,6 +99,25 @@ contract SponsorToken is OwnerableContract {
     return (orderBook[_id].issuer /**/ );
   }
   
+  // balance query
+  function getTipBalance(uint256 _id, address tipper) view public returns (uint256) {
+    require(_id < orderBookSize);
+    return orderBook[_id].tip_balance[tipper];
+  }
+  
+  function getTipRewardBalance(uint256 _id, address tipper) view public returns (uint256) {
+    require(_id < orderBookSize);
+    return orderBook[_id].tip_reward_balance[tipper];
+  }
+  
+  function withdrawRewardBalance(uint256 _id) public {
+    require(_id < orderBookSize);
+    require(orderBook[_id].tip_reward_balance[msg.sender] > 10);
+    msg.sender.transfer(orderBook[_id].tip_reward_balance[msg.sender]);
+    orderBook[_id].tip_reward_balance[msg.sender] = 0;
+  }
+  
+  
   // create Order
   function put(address _issuer, uint256 _tokenId) public {
     Issuer issuer = Issuer(_issuer);
@@ -102,6 +128,9 @@ contract SponsorToken is OwnerableContract {
     } else {
       orderBook[orderBookSize] = Order(_issuer, _tokenId, 0/* tip_balance_sum */, 0/* tip_balance_holder_len */, empty);
     }
+    // queue starts with 1
+    // gas warning!! fixme
+    orderBook[orderBookSize].tip_balance_holder.push(0x0);
     orderBookSize += 1;
   }
 
@@ -126,17 +155,13 @@ contract SponsorToken is OwnerableContract {
     uint256 balance = orderBook[_id].tip_balance[holder];
     uint256 sum = orderBook[_id].tip_balance_sum;
 
-    return balance / sum * 100;
+    return percent(balance, sum, 10);
   }
   
   function addTipBalance(uint256 _id, address tipper, uint256 amount) private {
     require(_id < orderBookSize);
-    var order = orderBook[_id];
-    if (order.tip_balance[tipper] == 0) {
-        order.tip_balance[tipper] = amount;
-    } else {
-        order.tip_balance[tipper] += amount;
-    }
+    Order order = orderBook[_id];
+    order.tip_balance[tipper] += amount;
     order.tip_balance_sum += amount;
     // add to queue if needed
     if (!inTipperQueue(_id, tipper)) {
@@ -150,12 +175,12 @@ contract SponsorToken is OwnerableContract {
     orderBook[_id].tip_balance_sum -= amount;
 
     orderBook[_id].tip_balance[tipper] -= amount;
-    orderBook[_id].tip_reward_balance[tipper] -= amount;
+    orderBook[_id].tip_reward_balance[tipper] += amount;
     // (?) remove from queue
   }
 
   // sponsor Order
-  function sponsor(uint256 _id) public payable{
+  function sponsor(uint256 _id) public payable {
     require(_id < orderBookSize);
     require(!isContract(msg.sender));
     
