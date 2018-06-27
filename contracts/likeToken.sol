@@ -40,7 +40,7 @@ contract OwnerableContract{
   }  
 }
 
-contract SponsorToken is OwnerableContract{
+contract SponsorToken is OwnerableContract {
   struct Order {
     address issuer;
     uint256 tokenId;
@@ -70,7 +70,7 @@ contract SponsorToken is OwnerableContract{
     return size > 0;
   }  
 
-  function SponsorToken() public {
+  constructor() public {
     owner = msg.sender;
     admins[owner] = true;    
   }
@@ -94,7 +94,6 @@ contract SponsorToken is OwnerableContract{
   
   // create Order
   function put(address _issuer, uint256 _tokenId) public {
-    //TODO _tokenId unique?
     Issuer issuer = Issuer(_issuer);
     require(issuer.ownerOf(_tokenId) == msg.sender);
     address[] memory empty;
@@ -115,7 +114,7 @@ contract SponsorToken is OwnerableContract{
     orderBook[_id].tip_balance_holder_len ++;
     uint256 holder_id = orderBook[_id].tip_balance_holder_len;
     orderBook[_id].tipper_to_holder_id[tipper] = holder_id;
-    orderBook[_id].tip_balance_holder[holder_id] = tipper;
+    orderBook[_id].tip_balance_holder.push(tipper);
   }
   
   function getTipperPercentage(uint256 _id, uint256 tipper_id) view private returns (uint256 percentage) {
@@ -129,10 +128,16 @@ contract SponsorToken is OwnerableContract{
 
     return balance / sum * 100;
   }
+  
   function addTipBalance(uint256 _id, address tipper, uint256 amount) private {
     require(_id < orderBookSize);
-    orderBook[_id].tip_balance[tipper] += amount;
-    orderBook[_id].tip_balance_sum += amount;
+    var order = orderBook[_id];
+    if (order.tip_balance[tipper] == 0) {
+        order.tip_balance[tipper] = amount;
+    } else {
+        order.tip_balance[tipper] += amount;
+    }
+    order.tip_balance_sum += amount;
     // add to queue if needed
     if (!inTipperQueue(_id, tipper)) {
       addToTipperQueue(_id, tipper);
@@ -150,35 +155,21 @@ contract SponsorToken is OwnerableContract{
   }
 
   // sponsor Order
-  function sponsor(uint256 _id, address _referrer) public payable{
+  function sponsor(uint256 _id) public payable{
     require(_id < orderBookSize);
     require(!isContract(msg.sender));
-    require(_referrer != msg.sender);
     
-    // 3% cut off for Issuer
     uint256 tipValue = msg.value * 97 / 100;
-
-    Issuer issuer = Issuer(orderBook[_id].issuer);
-    issuer.ownerOf(orderBook[_id].tokenId).transfer(msg.value - tipValue);
+    uint256 issuerShare = msg.value - tipValue;
 
     addTipBalance(_id, msg.sender, tipValue); 
-
-    // there's referrer
-    if (_referrer != address(0) && orderBook[_id].tip_balance[_referrer] != 0) {
-      if (tipValue <= orderBook[_id].tip_balance[_referrer]) {
-        withdrawTipBalance(_id, _referrer, tipValue);
-        tipValue = 0;
-      } else {
-        tipValue -= orderBook[_id].tip_balance[_referrer];
-        withdrawTipBalance(_id, _referrer, orderBook[_id].tip_balance[_referrer]);
-      }      
-    }
 
     uint256 id = tip_balance_holder_head;
     uint256 p = getTipperPercentage(_id, id);
     uint256 tipValueToShare = tipValue;
-    while (tipValueToShare > 0) {
-      while (p != 0) {
+
+    while (p != 0) {
+      if (orderBook[_id].tip_balance_holder[id] != msg.sender) {
         uint256 maxWithdrawShare = tipValueToShare * p;
         address holder = orderBook[_id].tip_balance_holder[id];
         uint256 holderBalance = orderBook[_id].tip_balance[holder];
@@ -190,12 +181,13 @@ contract SponsorToken is OwnerableContract{
           withdrawTipBalance(_id, holder, holderBalance);
           tipValue -= holderBalance;
         }
-
-        id ++;
-        p = getTipperPercentage(_id, id);
       }
-      tipValueToShare = tipValue;
+      id ++;
+      p = getTipperPercentage(_id, id);
     }
+    issuerShare += tipValue;
+    Issuer issuer = Issuer(orderBook[_id].issuer);
+    issuer.ownerOf(orderBook[_id].tokenId).transfer(issuerShare);
   }
 }
 
