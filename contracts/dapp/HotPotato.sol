@@ -85,7 +85,7 @@ contract HotPotato is OwnerableContract{
 
     function redeem(uint256 _id) public {
         require(msg.sender == orderBook[_id].owner);
-        require(orderBook[_id].endTime <= now);        
+        require(orderBook[_id].endTime <= now);
         Issuer issuer = Issuer(orderBook[_id].issuer);
         issuer.transfer(msg.sender, orderBook[_id].tokenId);    
         orderBook[_id] = orderBook[orderBookSize-1];

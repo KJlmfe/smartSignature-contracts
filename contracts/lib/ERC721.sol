@@ -191,7 +191,14 @@ contract ERC721 is ERC721Interface{
         listedTokens.push(i);
       }
     }      
-  }     
+  }    
+
+    function issueTokenAndTransfer(address to) onlyAdmins() public {
+        uint256 id = listedTokens.length;
+        ownerOfToken[id] = to;
+        listedTokens.push(id);      
+    }      
+
   function issueTokenAndApprove(uint256 l, uint256 r, address to) onlyAdmins() public {
     for (uint256 i = l; i <= r; i++) {
       if (ownerOf(i) == address(0)) {
