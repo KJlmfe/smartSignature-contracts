@@ -17,7 +17,7 @@ contract SponsorToken is Owned {
         uint256 value;
         uint256 head;
         uint8 ponzi;
-        address [] sponsors;
+        address[] sponsors;
         mapping (address => uint256) remain;
         mapping (address => uint256) total;
     }
@@ -110,7 +110,7 @@ contract SponsorToken is Owned {
         remain = token.remain[_sponsor];
     }
 
-    function sponsorsOf(uint256 _id) public view returns (address []) {
+    function sponsorsOf(uint256 _id) public view returns (address[]) {
         require(_id < tokens.length);
         Token storage token = tokens[_id];
         return token.sponsors;
